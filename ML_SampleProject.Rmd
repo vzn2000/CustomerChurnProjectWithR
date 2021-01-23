@@ -1,0 +1,475 @@
+---
+title: "R Sample Study"
+author: "Vedat Ozkan"
+date: "1/21/2021"
+output: html_document
+editor_options: 
+  chunk_output_type: inline
+---
+
+# CUSTOMER CHURN DETECTION
+
+# 1.INTRODUCTION:
+
+This project is prepared for Data Scientist / Data Analyst roles in FRAYM in Arlington,VA. In this project, it is targeted to display R Programming skill that is required to apply to the position. In this project, the data that keeps the information of a bank customers will be used to make descriptive and predictive analysis. However, it is not targeted to catch high algorithm result
+
+
+# 2.BUSINESS PROBLEM:
+
+According to scenario, The goal is to predict customers who have potential to quit working our bank. So business teams will be able to concentrate on detection possible customer churn.
+
+# 3.DATA DESCRIPTION:
+
+We have a csv file keeping more than forty-one thousands of customer list for this study. The data is made up of 21 features that keeps customer details in csv file. The column titles referring to features are explained below:
+  
+ 1.Dependent variable (labeled variable) : "Exited"
+ 
+  "Exited" column refers to customer churn. 
+  - If observation point 1, that means customer quit to work with the bank.
+  - If observation point 0, that means customer is ongoing to work with the bank.
+ 
+ 2.Independent variables in data below : 
+  
+    a)"age": 
+    b)"job": 
+    c)"marital":
+    d)"education": 
+    e)"default":
+    f)"housing": 
+    g)"contact": 
+    h)"month":
+    i)"day_of_week":
+    j)"duration":
+    k)"campaign":
+    l)"pdays":
+    m)"previous":
+    n)"outcome":
+    o)"emp_var_rate":
+    p)"cons_price_idx":
+    q)cons_price_idx":
+    r)"euribor3m":
+    s)"nr_employed":
+  
+  
+# 4.METHODOLOGY:
+
+This project will be implemented in 2 phases.
+
+A. In descriptive analysis, it will be focused on understanding customer data, then pre-processing (data wrangling) will be implemented for predictive analysis. 
+
+B. In Predictive analysis phase, it will be created a Machine Learning model enabling to predict customers for classification. 
+
+
+## A. Descriptive Analysis
+
+### I. Load Packages 
+
+```{r}
+
+library(tidyverse)
+library(Hmisc)
+library(rpart)
+library(gbm)
+library(readr)
+library(knitr)
+library(ggplot2)
+library(modelr)
+library(ggpubr)
+library(ROCR)
+
+```
+
+
+### II. Load Dataset From Outsource
+
+```{r}
+
+
+file = "https://raw.githubusercontent.com/vzn2000/sample_dataset/master/bankcustomers-data.csv" 
+
+data <- read.csv(file)
+
+head(data, dec=",")
+
+
+```
+
+
+### III. Explanatory Data Analysis and Data Preprocessing 
+
+It will be manipulated data for further analysis while exploring.
+
+
+#### (a) Examine Data 
+
+- Check data format
+```{r}
+
+is.data.frame(data) 
+
+
+```
+
+
+- Check variable types in data
+```{r}
+
+str(data)
+
+```
+
+
+- Check data volume
+```{r}
+
+dim(data)
+
+
+```
+
+
+- Check data summary
+```{r}
+summary(data)
+  
+```
+
+
+
+
+#### (b) Check Missing Values
+
+
+- Is there any missing value ?
+```{r}
+
+sum(is.na(data))
+
+```
+
+(Note: If there were null values I would try to understand reason. If nulls are randomly, I would fill them mean or fix value or drop from data. It depends on situation.)
+
+In order to fill missing value, I would prefer to use one of below:
+
+df$age[is.na(df$age)]<- mean(data$age, na.rm=TRUE)
+
+OR
+
+data %>% mutate(c1 = replace_na(age, mean(data$age, na.rm=TRUE)) 
+
+
+```{r}
+
+mean(data$age, na.rm=TRUE)
+
+```
+
+
+
+
+#### (c) Outliers
+
+- Box Plot Graph is the most common method to observe outliers. Then we can remove outliers or change outliers with mean values or threshold values using Interquartile Range (IQR).
+
+
+```{r}
+# Box Whisker Plot
+
+ggplot(data,aes(age)) +
+  geom_boxplot(color ="black", 
+            fill = "orange") +
+  xlab("Education") +
+  ylab("Number of Customer") + 
+  ggtitle("Age Distribution")
+```
+
+According to Box Plot chart, there are several outliers in age variable. However, we assume there is no outlier in dataset. 
+
+
+
+
+- Let's make several data manipulation and data visualization for this part.
+
+```{r}
+
+# Histogram and Density Graphs
+
+ggplot(data, aes(age)) +
+  geom_histogram(aes(y = ..density..),
+                 color ="black", 
+                 fill = "orange") +
+  xlab("Age Distribution") +
+  ylab("Frequency") + 
+  ggtitle("Age Histogram")+
+  geom_density(alpha = .3,
+               fill = "black")
+
+
+
+
+#--------------------------
+
+
+
+ggplot(data, aes(age, fill=marital)) +
+  geom_histogram(binwidth = .5, 
+                 alpha = .5,
+                 position = "identity") +
+  xlab("Age") +
+  ylab("Frequency") + 
+  ggtitle("Marital Status by Age")
+
+
+
+```
+
+
+
+
+```{r}
+
+# Loan by Jobs
+
+ggplot(data,aes(job, fill=loan)) +
+  geom_bar()+
+  xlab("Jobs") +
+  ylab("Loan") + 
+  ggtitle("Loan by Jobs")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+
+```
+
+
+
+
+```{r}
+
+# Let's check average age by education groups 
+
+data %>%
+    group_by(education) %>%
+                    summarise(num = n(),
+                            avg_age = mean(age, na.rm = TRUE),
+                            med_age = median(age, na.rm = TRUE),
+                            std_age = sd(age, na.rm = TRUE),
+                            var_age = var(age, na.rm = TRUE)
+                            
+                            )
+
+
+
+```
+
+
+Data Aggregation Using "group_by"
+
+```{r}
+
+# Let's check average age by job groups 
+
+data %>%
+     group_by(job) %>%
+                  summarise(num = n(),
+                            avg_age = mean(age, na.rm = TRUE),
+                            med_age = median(age, na.rm = TRUE),
+                            std_age = sd(age, na.rm = TRUE),
+                            var_age = var(age, na.rm = TRUE)
+                            
+                            )
+
+```
+
+
+
+#### (d) Correlation of Independent Variables with Each Other
+
+In this step, we should explore the correlation of independent variables, and then we should eliminate some variables if they are represented by another variable. Two or more correlated variables can affect both prediction and performance negatively. ROC Curve is one of  the best options to reach correlation, also heat map and matrix can be used to see the correlation of variables.
+
+
+(Note:Spearman is utilized in parametric test whereas Pearson is utilized non-parametric test. Kendall is another method if data fails Normality Test. That means non-parametric test will be applied.)
+
+```{r}
+
+
+library("ggpubr")
+
+
+data_num<- data%>%
+    select(-job, -marital, -education, -default, -housing, -loan, -poutcome, -contact, -month, -day_of_week)
+
+
+cor(data_num, method = c("spearman"))
+
+```
+
+There are very high positive correlation between "nr_employed" and "euribor3m" and "emp_var_rate". There are also some moderate negative correlations between a few variables that we can see the matrix above. We can think to remove 2 of 3 correlated variables after ROC Curve Analysis. We can understand which one covers the other ones from graph. That mean one variable represent the others mostly.
+
+
+```{r}
+
+library(ROCR)
+
+data(ROCR.simple)
+
+
+df_roc<-data.frame(ROCR.simple)
+
+pred1<- prediction(data$nr_employed , data_num$Exited)
+pred2<- prediction(data$euribor3m , data_num$Exited)
+pred3<- prediction(data$emp_var_rate , data_num$Exited)
+
+
+perf1<- performance(pred1, "tpr","fpr")
+perf2<- performance(pred2, "tpr","fpr")
+perf3<- performance(pred3, "tpr","fpr")
+
+
+plot(perf1)
+plot(perf2, add = TRUE,)
+plot(perf3, add = TRUE, colorize=TRUE)
+
+```
+As we can understand from ROC graph, "emp_var_rate" represents other 2 variables. So we can remove "nr_employed" and "euribor3m".
+
+
+
+#### (e) Correlation of Independent Variables With Target Variable
+
+This is also another important subject. When we explore impact of independent variables on target (dependent variable) we will understand importance of level of independent variables. In this situation, it will be unnecessary to hold non-correlated or low correlated variables from our predictive model. It depends!
+
+
+```{r}
+
+cor(y=data$Exited, x=data_num,  method = c("spearman"))
+
+```
+There is no important correlation between dependent and independent variables.
+
+
+
+## B. Predictive Analysis
+
+Now, we will convert all categorical data into numerical one, or remove from dataset if not need. Because ML algorithms runs only numerical data.
+
+
+### I.Data Encoding / One Hot Encoding
+
+
+Now we will select categorical variables and make them continuous data types
+
+```{r}
+
+library(caret)
+
+data_cat<-(
+  data%>%
+  select(job, marital, education, default, housing, loan, poutcome)
+           )
+
+dmy<- dummyVars("~ .", data = data_cat)
+
+trs<- data.frame(predict(dmy, newdata=data_cat))
+
+head(trs)
+
+```
+
+We converted categorical variables into continuous variable using Encoders. Now let's remove categorical columns from dataset and put new encoded data instead.
+
+```{r}
+
+# remove categorical variables. We assumed some categorical variables don't affect target variable. Therefore we will remove them as well.
+
+data_<-data%>%
+      select(-job, -marital, -education, -default, -housing, -loan, -poutcome, -contact, -month, -day_of_week, -nr_employed, -euribor3m )
+
+str(data_)
+
+
+```
+
+
+
+```{r}
+
+encoded_data<- cbind(data_, trs )
+
+head(encoded_data)
+```
+
+
+
+### II.Split Train and Test Data
+
+```{r}
+
+# split our data so that 30% is in the test set and 70% is in the training set
+
+split_df <- resample_partition (encoded_data, c(test= 0.3, train= 0.7))
+
+# how many cases are in test & training set? 
+
+lapply(split_df, dim)
+
+```
+
+
+
+
+### III. Set up Model 
+
+It will be utilized 3 different Machine Learning models. Additionally, it will make model tuning and hyperparameter assessment in this study. These are;
+
+  1) Linear Model
+  2) Classification Trees
+  3) Gradient Boosting Machine
+  
+  
+#### (a) Linear Model:
+
+```{r}
+# Let's apply lm
+
+fit <- lm( Exited ~ . , data = split_df$train)
+
+rmse (model = fit, data = split_df$test )
+
+```
+
+
+#### (b) Classification Trees
+
+```{r}
+# Let's apply classification tree
+
+fit <- rpart( Exited ~ ., data = split_df$train)
+
+rmse (model = fit, data = split_df$test )
+```
+
+
+
+#### (c) Gradient Boosting Machine
+
+```{r}
+
+# Let's apply GBM
+
+fit <- gbm( Exited ~ ., distribution = "bernoulli", data = split_df$train)
+
+rmse (model = fit, data = split_df$test )
+
+```
+
+
+# 5.RESULT AND DISCUSSION
+
+We created 3 different models for the dataset after data preprocessing. All models are observed to have low success prediction rate. It is assessed that dataset has data quality issue. 
+
+(Note: This dataset is created to be used in data analysis studies. So it is not represent a real data and it may be normal not to be found patterns of customers in the dataset. Pattern is vital for ML Algorithms to make correct prediction.)
+
+
+# 6.CONCLUSION
+
+The purpose of this project is to display R Programming, Statistics and Machine Learning skills rather then catching a high success rate in model. In addition , it was put explanations for several details that was not applied. Several irrelevant data manipulation is made to show technical skills in this study. Besides, basic data science and reporting skills are tried to exhibited in very short study time.
+
