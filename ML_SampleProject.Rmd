@@ -67,9 +67,8 @@ B. In Predictive analysis phase, it will be created a Machine Learning model ena
 ```{r}
 
 library(tidyverse)
-library(Hmisc)
 library(rpart)
-library(gbm)
+library(rpart.plot)
 library(readr)
 library(knitr)
 library(ggplot2)
@@ -84,6 +83,8 @@ library(ROCR)
 
 ```{r}
 
+
+set.seed(1234)
 
 file = "https://raw.githubusercontent.com/vzn2000/sample_dataset/master/bankcustomers-data.csv" 
 
@@ -206,8 +207,9 @@ ggplot(data, aes(age)) +
 
 
 
+```
 
-#--------------------------
+```{r}
 
 
 
@@ -221,8 +223,8 @@ ggplot(data, aes(age, fill=marital)) +
 
 
 
-```
 
+```
 
 
 
@@ -354,7 +356,6 @@ Now, we will convert all categorical data into numerical one, or remove from dat
 
 ### I.Data Encoding / One Hot Encoding
 
-
 Now we will select categorical variables and make them continuous data types
 
 ```{r}
@@ -363,7 +364,7 @@ library(caret)
 
 data_cat<-(
   data%>%
-  select(job, marital, education, default, housing, loan, poutcome)
+  select(job, marital, education, default, housing, loan, contact, month, day_of_week, poutcome)
            )
 
 dmy<- dummyVars("~ .", data = data_cat)
@@ -371,6 +372,7 @@ dmy<- dummyVars("~ .", data = data_cat)
 trs<- data.frame(predict(dmy, newdata=data_cat))
 
 head(trs)
+
 
 ```
 
@@ -381,7 +383,7 @@ We converted categorical variables into continuous variable using Encoders. Now 
 # remove categorical variables. We assumed some categorical variables don't affect target variable. Therefore we will remove them as well.
 
 data_<-data%>%
-      select(-job, -marital, -education, -default, -housing, -loan, -poutcome, -contact, -month, -day_of_week, -nr_employed, -euribor3m )
+      select( -job, -marital, -education, -default, -housing, -loan, -poutcome, -contact, -month, -day_of_week, -nr_employed, -euribor3m )
 
 str(data_)
 
@@ -407,6 +409,7 @@ head(encoded_data)
 
 split_df <- resample_partition (encoded_data, c(test= 0.3, train= 0.7))
 
+
 # how many cases are in test & training set? 
 
 lapply(split_df, dim)
@@ -418,58 +421,57 @@ lapply(split_df, dim)
 
 ### III. Set up Model 
 
-It will be utilized 3 different Machine Learning models. Additionally, it will make model tuning and hyperparameter assessment in this study. These are;
-
-  1) Linear Model
-  2) Classification Trees
-  3) Gradient Boosting Machine
-  
-  
-#### (a) Linear Model:
-
-```{r}
-# Let's apply lm
-
-fit <- lm( Exited ~ . , data = split_df$train)
-
-rmse (model = fit, data = split_df$test )
-
-```
+It will be utilized Decision Trees.
 
 
-#### (b) Classification Trees
+####  (a) Decision Trees
 
 ```{r}
 # Let's apply classification tree
 
-fit <- rpart( Exited ~ ., data = split_df$train)
 
-rmse (model = fit, data = split_df$test )
+fit <- rpart( Exited ~ ., data = split_df$train, method ="class", parms = list(split = "information"))
+
+y_pred <- predict(fit, split_df$test, type="class")
+
+y_pred <- data.frame(y_pred)
+
+y_test <- data.frame(split_df$test)%>%select(Exited)
+
+
+accuracy<- mean( y_pred == y_test)
+
+accuracy
+
 ```
 
-
-
-#### (c) Gradient Boosting Machine
 
 ```{r}
 
-# Let's apply GBM
+rpart.plot(fit, extra =106, )
 
-fit <- gbm( Exited ~ ., distribution = "bernoulli", data = split_df$train)
-
-rmse (model = fit, data = split_df$test )
 
 ```
+
+#### (b) Model Tuning
+
+```{r}
+
+
+
+```
+
+
+
 
 
 # 5.RESULT AND DISCUSSION
 
-We created 3 different models for the dataset after data preprocessing. All models are observed to have low success prediction rate. It is assessed that dataset has data quality issue. 
 
-(Note: This dataset is created to be used in data analysis studies. So it is not represent a real data and it may be normal not to be found patterns of customers in the dataset. Pattern is vital for ML Algorithms to make correct prediction.)
+
 
 
 # 6.CONCLUSION
 
-The purpose of this project is to display R Programming, Statistics and Machine Learning skills rather then catching a high success rate in model. In addition , it was put explanations for several details that was not applied. Several irrelevant data manipulation is made to show technical skills in this study. Besides, basic data science and reporting skills are tried to exhibited in very short study time.
+
 
